@@ -1,4 +1,4 @@
-"""Testing the istribution of features"""
+"""Testing the distribution of features"""
 import os
 import pandas as pd
 import numpy as np

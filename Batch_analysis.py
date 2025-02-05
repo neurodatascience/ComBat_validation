@@ -1,3 +1,4 @@
+"""This script is used to find the number of sites from the real data. A site is identified if it has unique combinations of InstitutionName, Manufacturer, ManufacturersModelName"""
 import os
 import pandas as pd
 # import matplotlib.pyplot as plt

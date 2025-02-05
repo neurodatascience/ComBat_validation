@@ -1,8 +1,8 @@
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy import stats
-import numpy as np
+# import matplotlib.pyplot as plt
+# from scipy import stats
+# import numpy as np
 from collections import Counter
 
 script_directory = os.getcwd()
@@ -110,8 +110,16 @@ data2 = data1.merge(unique_batch[['InstitutionName', 'Manufacturer', 'Manufactur
               on=['InstitutionName', 'Manufacturer', 'ManufacturersModelName'], 
               how='left')
 
-# Print the updated DataFrame with the Batch_ID
+#assign these batch_id to all rows in 
+data2 = data1.merge(unique_batch[['InstitutionName', 'Manufacturer', 'ManufacturersModelName', 'Batch_ID']], 
+              on=['InstitutionName', 'Manufacturer', 'ManufacturersModelName'], 
+              how='left')
+
+columns_to_lower = ['InstitutionName', 'Manufacturer', 'ManufacturersModelName']
+data2[columns_to_lower] = data2[columns_to_lower].apply(lambda x: x.str.lower())
 print(data2)
+data2.to_csv(os.path.join(script_directory,'batch_data_cleaned.csv'),index=False)
+
 batch_ids=data2['Batch_ID'].astype(int)
 batch_id_counts = Counter(batch_ids)
 batch_id_counts_df = pd.DataFrame(batch_id_counts.items(), columns=['Batch_ID', 'count'])
@@ -126,3 +134,23 @@ data3 = batch_id_counts_df.merge(aggregated_data, on='Batch_ID', how='left')
 print(data3)
 loc_directory="/Users/xiaoqixie/Desktop/Winter_Rotation/d-ComBat_project"
 data3.to_csv(os.path.join(loc_directory,"counts_sites_new.scv"),index=False)
+
+# #try muultinomial distribution
+# n_trials = len(batch_ids)  
+# batch_id_counts = Counter(batch_ids)
+# batch_id_counts_df = pd.DataFrame(batch_id_counts.items(), columns=['batch_id', 'count'])
+# batch_id_counts_df['probability'] = batch_id_counts_df['count'] / n_trials
+
+# # print("Batch ID Probabilities:")
+# # print(batch_id_counts_df[['batch_id', 'probability']])
+
+# probabilities = batch_id_counts_df['probability'].values
+
+# multinomial_dist = stats.multinomial(n_trials, probabilities)
+
+# #generate random number from this distribution
+# random_sample = multinomial_dist.rvs(1)
+# print(len(random_sample[0]))
+# random_sample_df = pd.DataFrame(random_sample, columns=batch_id_counts_df['batch_id'])
+# unique_sample = random_sample_df.T.drop_duplicates().T
+# print(f"Unique random sample:\n{unique_sample}")

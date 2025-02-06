@@ -29,10 +29,13 @@ print((data['Manufacturer'].drop_duplicates()))
 #similar check for Manufacturer
 
 #number of samples per site suggested by ComBat and d-ComBat papers
-"""The original ComBat paper metioned that when the batch size is less than 10, empirical bayesian will not work well.
-The federated avering paper further metioned the effetiveness of their method for unblanaced,dependent data. The federated averaging algorithm is tested on data with small atch size and moderate numbers within each batch )sample size per batch is at least number of batches).
-d-ComBat paper uses 53 batches, with a total of 505 samples aross all sites. Siements 213, Philips 70, GE 222.
+"""The original ComBat paper metioned that when the batch size (the number of batches) is less than 10, empirical bayesian will not work well.
+The federated averging paper further metioned the effetiveness of their method for unblanaced,dependent data. The federated averaging algorithm is tested on data with small atch size and moderate numbers within each batch )sample size per batch is at least number of batches).
+d-ComBat paper uses 53 batches, with a total of 505 samples aross all sites (approximately 10 samples per site). Siements 213, Philips 70, GE 222.
+
+Thus, I will start from 131 sites with 20 samples per site. 
 """
+
 data_script=os.path.join(script_directory,'batch_data_cleaned.csv')
 data=pd.read_csv(data_script)
 print(data.columns)

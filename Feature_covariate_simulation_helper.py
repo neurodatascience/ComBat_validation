@@ -143,7 +143,7 @@ def fixed_effect_nonlinear(x_df):#control this to have at most on modal
             #leaky_relu(self.hidden_layer1(x))
             # h = torch.relu(self.hidden_layer2(h))
             # h = torch.relu(self.hidden_layer3(h))
-            out = 10*(np.sin(2*np.pi*self.output_layer(h)/10)+1)
+            out = 10*(np.sin(2*np.pi*self.output_layer(h)/10))
             return (out)
 
     # torch.manual_seed(549)
@@ -162,9 +162,4 @@ def fixed_effect(x_df,effect_type):
     if effect_type=="linear":
         theta_g=(stats.norm.rvs(loc=0,scale=1,size=2))
         phi_g=np.dot(x_df,theta_g)
-        return(phi_g+10)
-
-            
-
-
-    
+        return(phi_g)

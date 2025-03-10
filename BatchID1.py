@@ -1,4 +1,4 @@
-"""In the script Batch_analysis.py, I cleaned raw data and corrected institution name if they are from the same institution but names are different.
+"""In the script BatchID.py, I cleaned raw data and corrected institution name if they are from the same institution but names are different.
 I also removed some records if the insitution is not specified correctly, such as names like 'Section of BrainImaging','.'.
 After cleaness, we have 1714 records left and we have 131 sites for counting batch effects (unqiue combinations of InstitutionName, Manufacturer, ManufacturersModelName).
 The number of sites may change in the future if mistakes are found during the process of correcting insitution names.

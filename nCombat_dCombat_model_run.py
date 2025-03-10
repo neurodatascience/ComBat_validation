@@ -1,23 +1,20 @@
 """In tihs script, I run two models neuro-combat and d-combat"""
-
 import pandas as pd
 import numpy as np
-import sys
 import distributedCombat as dc
 import os
 import pickle
 import neuroCombat as nc
 
 print("Import data")
-script_dir=os.path.realpath(os.path.dirname(__file__))
+common_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation"
 
-data_file="Data_Michelle"
+data_file="ppmi-age-sex-case-aseg"
 
-Data_path=os.path.join(script_dir,"d-ComBat_project",data_file)
+Data_path=os.path.join(common_path,"d-ComBat_project",data_file)
 
-file_name=f'ppmi-age-sex-case-aseg'
-Data=pd.read_csv(os.path.join(Data_path,f'{file_name}.tsv'),sep="\t")
-                             
+file_name=f'data_80batches'
+Data=pd.read_csv(os.path.join(Data_path,f'{file_name}.csv'))
 
 def dat_function(Data,data_type):
     if data_type=="simulated":
@@ -38,15 +35,15 @@ batch_col = "batch"
 covars = pd.DataFrame({batch_col: batch})
 print("covars:",covars.shape)
 
-os.makedirs(os.path.join(script_dir,'combat_sites',file_name),exist_ok=True)
+os.makedirs(os.path.join(common_path,'combat_sites',data_file),exist_ok=True)
 
 print("dat.shape",dat.shape)
 com_out = nc.neuroCombat(dat, covars, batch_col)
 # print(com_out['data'])
 d=pd.DataFrame(com_out['data'])
-d.to_csv(os.path.join(script_dir,f"combat_sites/{file_name}/neuro_data.csv"),index=False)
+d.to_csv(os.path.join(common_path,f"combat_sites/{data_file}/neuro_data.csv"),index=False)
 
-file_path = os.path.join(script_dir, f'combat_sites/{file_name}/neuro_combat.pickle')
+file_path = os.path.join(common_path, f'combat_sites/{data_file}/neuro_combat.pickle')
 with open(file_path, "wb") as f:
     pickle.dump(com_out, f)
 
@@ -59,7 +56,7 @@ for b in covars[batch_col].unique():
     df = dat.loc[:, s.to_numpy()]  
     bat = covars[batch_col][s]
     x = mod.loc[s, :]
-    f = f"combat_sites/{file_name}/site_out_" + str(b) + ".pickle"
+    f = f"{common_path}/combat_sites/{data_file}/site_out_" + str(b) + ".pickle"
     out = dc.distributedCombat_site(df, bat, x, verbose=True, file=f)
     site_outs.append(f)
 
@@ -75,7 +72,7 @@ for b in covars[batch_col].unique():
     df = dat.loc[:, s.to_numpy()]  
     bat = covars[batch_col][s]
     x = mod.loc[s, :]
-    f = f"combat_sites/{file_name}/site_out_" + str(b) + ".pickle"
+    f = f"{common_path}/combat_sites/{data_file}/site_out_" + str(b) + ".pickle"
     out = dc.distributedCombat_site(df, bat, x, verbose=True, central_out=central, file=f)
     site_outs.append(f)
 
@@ -100,7 +97,7 @@ if data_type=="simulated":
         df = dat.loc[:, s]
         bat = covars[batch_col][s]
         x = mod.loc[s, :]
-        f = f"combat_sites/{file_name}/site_out_" + str(b) + ".pickle"
+        f = f"{common_path}/combat_sites/{data_file}/site_out_" + str(b) + ".pickle"
         out = dc.distributedCombat_site(df, bat, x, central_out=central, file=f)
         site_outs.append(f)
         """compare with grouth truth"""
@@ -136,7 +133,7 @@ elif data_type=="not_simulated":
         df = dat.loc[:, s]
         bat = covars[batch_col][s]
         x = mod.loc[s, :]
-        f = f"combat_sites/{file_name}/site_out_" + str(b) + ".pickle"
+        f = f"{common_path}/combat_sites/{data_file}/site_out_" + str(b) + ".pickle"
         out = dc.distributedCombat_site(df, bat, x, central_out=central, file=f)
         site_outs.append(f)
     
@@ -145,7 +142,7 @@ print("central['var_pooled']:", central['var_pooled'])
 if data_type=="simulated":
     rmse=pd.concat(rmse, axis=1)
     print("RMSE:",rmse)
-    rmse.to_csv(os.path.join(script_dir,f"combat_sites/{file_name}/rmse.csv"),index=False)
+    rmse.to_csv(os.path.join(common_path,f"combat_sites/{data_file}/rmse.csv"),index=False)
     error=pd.concat(error)
     perror=pd.concat(perror)
 
@@ -156,3 +153,4 @@ if data_type=="simulated":
     print("min perror", (perror).min(axis=1).min())
 
 print("===============================================================")
+

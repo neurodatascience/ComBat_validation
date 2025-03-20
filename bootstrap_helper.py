@@ -66,45 +66,59 @@ def neuro_combat_train(bootstrapped_data):
         
         result={}
         for t in range(ntimes):
-            data=bootstrapped_data[t]            
+            data=bootstrapped_data[t]  
+
+            #ensure their class is matching the requirement of model
+            data['age'] = pd.to_numeric(data['age'], errors='coerce')
+            data['sex'] = data['sex'].astype('category') 
+          
             #do neuro-combat for this resampled data
             feature_cols = [col for col in data.columns if col not in ["batch", "age", "sex"]]
             dat = data[feature_cols].T
             print("dat.shape:",dat.shape)
             mod=pd.DataFrame(np.array(data[["age","sex"]]))
+            mod.columns=["age","sex"]
             print("mod.shape:",mod.shape)
 
             batch = data['batch'].astype(int)
             batch = pd.Categorical(batch)  
             batch_col = "batch"
-            covars = pd.DataFrame({batch_col: batch})
-            print("covars:",covars.shape)
+            covars = pd.DataFrame({batch_col: batch,
+                                   mod.columns[0]:mod[mod.columns[0]],
+                                   mod.columns[1]:mod[mod.columns[1]]})
 
-            output=nc.neuroCombat(dat, covars, batch_col)
+            print("covars:",covars.columns)
+
+            output=nc.neuroCombat(dat,covars, batch_col,categorical_cols='sex',continuous_cols='age')
             result[t]={"combat_data":output['data'],
-                    "alpha":output["estimates"]['a_prior'],
-                    "beta":output['estimates']['b_prior'],
+                    "alpha":output["estimates"]['stand.mean'],
+                    "beta":output['estimates']['beta.hat'],
                     "delta_star":output['estimates']['delta.star'],
                     "gamma_star":output['estimates']['gamma.star']}
     else:
             data=bootstrapped_data
+            data['age'] = pd.to_numeric(data['age'], errors='coerce')
+            data['sex'] = data['sex'].astype('category') 
+
             #do neuro-combat for this resampled data
             feature_cols = [col for col in data.columns if col not in ["batch", "age", "sex"]]
             dat = data[feature_cols].T
             print("dat.shape:",dat.shape)
             mod=pd.DataFrame(np.array(data[["age","sex"]]))
+            mod.columns=["age","sex"]
             print("mod.shape:",mod.shape)
 
             batch = data['batch'].astype(int)
             batch = pd.Categorical(batch)  
             batch_col = "batch"
-            covars = pd.DataFrame({batch_col: batch})
+            covars = pd.DataFrame({batch_col: batch,mod.columns[0]:mod[mod.columns[0]],
+                                   mod.columns[1]:mod[mod.columns[1]]})
             print("covars:",covars.shape)
 
-            output=nc.neuroCombat(dat, covars, batch_col)
+            output=nc.neuroCombat(dat, covars, batch_col,categorical_cols='sex',continuous_cols='age')
             result={"combat_data":output['data'],
-                    "alpha":output["estimates"]['a_prior'],
-                    "beta":output['estimates']['b_prior'],
+                    "alpha":output["estimates"]['stand.mean'],
+                    "beta":output['estimates']['beta.hat'],
                     "delta_star":output['estimates']['delta.star'],
                     "gamma_star":output['estimates']['gamma.star']}
 
@@ -134,6 +148,7 @@ def d_combat_train(bootstrapped_data,file_path):
             dat = pd.DataFrame(np.array(data[feature_cols]).T)
             print("dat.shape:",dat.shape)
             mod=pd.DataFrame(np.array(data[["age","sex"]]))
+            mod.columns=["age","sex"]
             print("mod.shape:",mod.shape)
 
             batch = data['batch'].astype(int)
@@ -188,7 +203,7 @@ def d_combat_train(bootstrapped_data,file_path):
                 file_name = os.path.join(file_path1, site_out)
                 with open(file_name, "rb") as f:
                     site_data = pickle.load(f)  
-                    result[t][site_out]={"combat_data":site_data['dat_combat'],
+                    result[t][i]={"combat_data":site_data['dat_combat'],
                     "alpha":site_data["estimates"]['stand_mean'],
                     "beta":site_data['estimates']['beta_hat'],
                     "delta_star":site_data['estimates']['delta_star'],
@@ -203,6 +218,7 @@ def d_combat_train(bootstrapped_data,file_path):
             dat = pd.DataFrame(np.array(data[feature_cols]).T)
             print("dat.shape:",dat.shape)
             mod=pd.DataFrame(np.array(data[["age","sex"]]))
+            mod.columns=["age","sex"]
             print("mod.shape:",mod.shape)
 
             batch = data['batch'].astype(int)
@@ -257,7 +273,7 @@ def d_combat_train(bootstrapped_data,file_path):
                 file_name = os.path.join(file_path1, site_out)
                 with open(file_name, "rb") as f:
                     site_data = pickle.load(f)  
-                    result[site_out]={"combat_data":site_data['dat_combat'],
+                    result[i]={"combat_data":site_data['dat_combat'],
                     "alpha":site_data["estimates"]['stand_mean'],
                     "beta":site_data['estimates']['beta_hat'],
                     "delta_star":site_data['estimates']['delta_star'],
@@ -265,6 +281,3 @@ def d_combat_train(bootstrapped_data,file_path):
 
 
     return result
-
-
-

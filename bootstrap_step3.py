@@ -1,3 +1,4 @@
+#plot parameters alpha, beta, gamma, and delta
 import os
 import pandas as pd
 import pickle

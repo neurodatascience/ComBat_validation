@@ -49,13 +49,24 @@ from Feature_covariate_simulation_helper import age_sex_simulation,sites_samples
 import os
 import torch
 import json
+np.random.seed(666)
 
-print("import data")
-parameter_path=os.path.join("/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/d-ComBat_project/Data_simulation",
-                            'simulation.json')
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--config", type=str, required=True, help="Path to simulation config JSON file")
+args = parser.parse_args()
+
+parameter_path = args.config
 with open(parameter_path, "r") as f:
     config = json.load(f)
 
+# print("import data")
+# parameter_path=os.path.join("/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/d-ComBat_project/Data_simulation",
+#                             'simulation.json')
+# with open(parameter_path, "r") as f:
+#     config = json.load(f)
 
 # Access values
 sampling_type = config["sampling_type"]

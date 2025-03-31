@@ -3,7 +3,7 @@ import subprocess
 import json
 
 script_dir=os.path.dirname(os.path.realpath(__file__))
-script_path = os.path.join(script_dir,"ComBat_model.py")
+script_path = os.path.join(script_dir,"Data_simulation_ComBat_model.py")
 
 default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
 

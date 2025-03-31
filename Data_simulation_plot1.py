@@ -9,46 +9,70 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-script_dir=os.path.realpath(os.path.dirname(__file__))
+import json
 
-Data_path=os.path.join(script_dir,"simulated_data")
+default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
 
-file_name=f'data_gamma0.5_nonlinear'
+import argparse
 
-data=pd.read_csv(os.path.join(Data_path,f"{file_name}.csv"))
-                           
-# col = [name for name in data.columns if "ground" in name or "epsilon" in name]
-# data = data.drop(columns=col)
+parser = argparse.ArgumentParser()
+parser.add_argument("--config", type=str, required=True, help="Path to simulation config JSON file in Combat Sites")
+args = parser.parse_args()
 
-common_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
-file_path=f'{common_path}/{file_name}'
-filenames =os.listdir(file_path)
-#os.listdir(file_path)
-filenames=[f for f in filenames if "site_out" in f]
-# print(filenames)
-sorted_filenames = sorted(filenames, key=lambda x: int(x.split('_')[-1].split('.')[0]))
-print(sorted_filenames)
+parameter_path = args.config
+with open(parameter_path, "r") as f:
+    config = json.load(f)
 
-sites=[]
-for filename in sorted_filenames:
-    file_full_path = os.path.join(file_path, filename) 
+# x=24
+# parameter_path=os.path.join(default_path,f"min_points{x}",
+#                             f"Homogeneous_Homogeneous_Homogeneous_nonlinear_N{x*5}_G3_I5_Gamma4",
+#                             "simulation.json")
 
-    with open(file_full_path, "rb") as f:
-        site_data = pickle.load(f)
-        sites.append(site_data["dat_combat"])
-d_combat = np.column_stack(sites).T
-print("d_combat.shape:",d_combat.shape)
+# with open(parameter_path, "r") as f:
+#     config = json.load(f)
+
+# Access values
+sampling_type = config["sampling_type"]
+sex_type=config["sex_type"]
+age_type = config["age_type"]
+effect_type = config["effect_type"]
+N = config["N"]
+G = config["G"]
+I = config["I"]
+gamma_scale = config["gamma_scale"]
+smallest_sample_size=config["smallest_sample_size"]
+
+file_name=f'{sampling_type}_{sex_type}_{age_type}_{effect_type}_N{N}_G{G}_I{I}_Gamma{gamma_scale}'
+file_path=os.path.join(default_path,
+                                           f"min_points{smallest_sample_size}",
+                                            f'{file_name}')
+
+data=pd.read_csv(os.path.join(file_path,f"{file_name}.csv"))
+
+with open(os.path.join(file_path,'output_d.pkl'),'rb') as f:
+    d_output=pickle.load(f) 
+
+keys=d_output.keys()
+d_combat=[]
+for k in keys:
+    d_combat.append(d_output[k]['combat_data'])
+
+d_combat=pd.concat(d_combat,axis=1).T
+
 G=d_combat.shape[1]
 print("G:",G)
-d_combat=pd.DataFrame(d_combat, columns=[f'd_c{i}' for i in range(G)])
-# print(data.shape)
-# print(d_combat.shape)
+d_combat.columns=[f'd_c{i}' for i in range(G)]
+print("d_combat.shape:",d_combat)
 
-neuro_combat=pd.read_csv(f"{common_path}/{file_name}/neuro_data.csv")
+file_path1=f"{file_path}/output_n.pkl"
+with open(file_path1, "rb") as f:
+    n_combat = pickle.load(f)
+
+neuro_combat=pd.DataFrame(n_combat['combat_data'])
 neuro_combat=neuro_combat.T
 neuro_combat.columns=[f'd_c{i}' for i in range(G)]
 
-fig, axes = plt.subplots(G, 4, figsize=(15, 8)) 
+fig, axes = plt.subplots(G, 4, figsize=(5*G, 8)) 
 
 # Define color cycle
 color_cycle = itertools.cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
@@ -77,9 +101,7 @@ for i in range(G):
         
         y_n = neuro_combat.iloc[s, i]
 
-        j = batch - 1
-        site_j = sites[j]
-        y_c = site_j.iloc[i, :]  
+        y_c = d_combat.iloc[s, i]  
 
         x_min = min(x_min, age.min())-5
         x_max = max(x_max, age.max())+5
@@ -99,9 +121,7 @@ for i in range(G):
 
         y_n = neuro_combat.iloc[s, i] 
 
-        j = batch - 1
-        site_j = sites[j]
-        y_c = site_j.iloc[i, :]  
+        y_c = d_combat.iloc[s, i] 
 
         unique_sexes = np.unique(current_sex)
 
@@ -174,4 +194,4 @@ fig.legend(handles=legend_entries.values(), labels=legend_entries.keys(),
 
 plt.tight_layout(rect=[0, 0, 0.85, 1])  
 plt.savefig(os.path.join(file_path,"model_comparison.png"))
-plt.show()
+plt.close()

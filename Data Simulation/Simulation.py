@@ -9,7 +9,7 @@ Note:
 In that preprint, they used the Gamma distribution for delta_ig.
 Based on the assumption of empirical bayesian (Johnson et al., 2007),  
 I let delta follow an inverse gamma distribution.
-This implementation uses the inverse gamma accordingly.
+This implementation uses the Inverse Gamma accordingly.
 
 Simulation features:
 - Supports both equal and unequal sample sizes per batch.

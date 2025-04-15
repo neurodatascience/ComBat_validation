@@ -6,8 +6,9 @@ Batch Effect Harmonization in Collaborative Studies".
 This script allows to run more than 1 simulation at a time.
 
 Note:
-There may be a typo in the original paper regarding the distribution of delta_ig.
-Based on the referenced literature, delta should follow an inverse gamma distribution.
+In that preprint, they used the Gamma distribution for delta_ig.
+Based on the assumption of empirical bayesian (Johnson et al., 2007),  
+I let delta follow an inverse gamma distribution.
 This implementation uses the inverse gamma accordingly.
 
 Simulation features:
@@ -17,16 +18,16 @@ Simulation features:
 - Fixed effects from age and sex on the response variable can be linear or nonlinear.
 
 Configuration file: simulation.json
-- sampling_type: "Homogeneous" or "Heterogeneous"
+- sampling_type: "H" (Homogeneous) or "In" (Heterogeneous)
     For homo, batch size is same across batches.
     For heterogeneous, batch size is unequal.
 
 - simulation_times: an integer indicates the number of simulations
 
-- sex_type: "Homogeneous" or "Heterogeneous"
+- sex_type: "H" (Homogeneous) or "In" (Heterogeneous)
     Determines if sex ratio is 0.5.
     
-- age_type: "Homogeneous" or "Heterogeneous"
+- age_type: "H" (Homogeneous) or "In" (Heterogeneous)
     Determines if the age distribution is the same across all batches or varies between them.
 
 - effect_type: "linear" or "nonlinear"
@@ -44,6 +45,9 @@ Configuration file: simulation.json
 - gamma_scale: (float)
     Scaling factor for the inverse gamma distribution used in simulating tau_I.
 
+- smallest_sample_size_of_batches: (int)
+    The size of the smallest batch.
+
 The simulated dataset includes the ground truth (values without gamma and delta * epsilon), epsilon, batch ID, age, and sex.
 """
 
@@ -52,8 +56,9 @@ import numpy as np
 import pandas as pd
 from Simulation_helper import age_sex_simulation,sites_samples,fixed_effect 
 import os
-import torch
 import json
+import time
+import pickle
 # np.random.seed(666)
 
 import argparse
@@ -66,36 +71,43 @@ parameter_path = args.config
 with open(parameter_path, "r") as f:
     config = json.load(f)
 
+#######################################################################################
 # Access values
+store_folder=config["store_folder"]
 sampling_type = config["sampling_type"]
 simulation_times = config["simulation_times"]
 sex_type=config["sex_type"]
 age_type = config["age_type"]
 effect_type = config["effect_type"]
-N = config["N"]
+N = config["N"]#total sample size
 G = config["G"]
 I = config["I"]
 gamma_scale = config["gamma_scale"]
-file_name=f'{sampling_type}_simulation{simulation_times}_{sex_type}_{age_type}_{effect_type}_N{N}_G{G}_I{I}_Gamma{gamma_scale}'
+#####################################################################################
+file_name=f'N{N}'
 
+default_path=f'/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites/{store_folder}'
 
-print("==========================================================================")
+script_dir=os.path.realpath(os.path.dirname(__file__))
+
+max_retries = 3
+# print("==========================================================================")
 for i in range(simulation_times):
-    print("n_samples done")
+    print(f"simulation {i}")
+    # print("n_samples done")
     n_samples=sites_samples(sampling_type,N,I)
-    script_dir=os.path.realpath(os.path.dirname(__file__))
-    n_samples1=pd.DataFrame(n_samples)
 
-    smallest_sample_size= int(n_samples1.min()[0])
-
+    smallest_sample_size= int(np.min(n_samples))
+    
     #****************************************************************************#
     # Add to config and save updated JSON
-    config["smallest_sample_size"] = smallest_sample_size
+    config["smallest_sample_size_of_batches"] = smallest_sample_size
+
     with open(parameter_path, "w") as f:
         json.dump(config, f, indent=4)
+    ###########************************************************##################
 
-    results_common_path=os.path.join('/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites',
-                                    f'min_points{smallest_sample_size}',#minimum number of points in a site
+    results_common_path=os.path.join(default_path,
                                     f'{file_name}',f"simulation_{i}")
     os.makedirs(results_common_path,exist_ok=True)
 
@@ -104,48 +116,39 @@ for i in range(simulation_times):
     with open(new_config_path, "w") as f:
         json.dump(config, f, indent=4)
     #*************************************************************************************#
-    n_samples1.to_csv(os.path.join(results_common_path,'n_samples.csv'),index=False)
-    print('sample:',sum(n_samples))
 
     #This section will be the same for both the homogeneous and heterogeneous versions.
-    print("========================================================")
-    print("alpha_G done")
+    # print("========================================================")
+    # alpha_G 
     alpha_G = pd.Series(np.random.uniform(0, 0.5,G))
-    alpha_G.to_csv(os.path.join(results_common_path,'alpha_G.csv'),index=False)
-    print("===============================================================================")
-    print("gamma_IG done")
+    # alpha_G.to_csv(os.path.join(results_common_path,'alpha_G.csv'),index=False)
+    # ===============================================================================
+    # gamma_IG done
     Y_I=np.random.uniform(0,0.1,I)
     tau_I=stats.invgamma.rvs(a=2, scale=gamma_scale,size=I)#site effect
-    df1 = pd.DataFrame({'Y_i': Y_I, 'tau_i': tau_I})
-    gamma_IG=[]
-    for i in range(I):
-        x=df1.iloc[i,:]
-        v=stats.norm.rvs(loc=x['Y_i'], scale=(x['tau_i']), size=G)
-        gamma_IG.append(v)
-    gamma_IG1=pd.DataFrame(np.column_stack(gamma_IG))
-    gamma_IG1.to_csv(os.path.join(results_common_path,"gamma_IG.csv"),index=False)
-    print("==========================================================================")
-    print("delta_IG done")
+    
+    gamma_IG=stats.norm.rvs(loc=Y_I[:,None], scale=tau_I[:,None], size=(I, G))
+    gamma_IG1 = pd.DataFrame(gamma_IG, index=[f'batch_{i}' for i in range(I)],
+                  columns=[f'feature_{g}' for g in range(G)])
+
+    # ==========================================================================
+    # delta_IG 
     lambda_I=stats.gamma.rvs(a=50,scale=50,size=I)
     v_I=stats.gamma.rvs(a=50,scale=1,size=I)
-    df1=pd.DataFrame({'lambda_i':lambda_I,'v_i':v_I})
-    delta_IG = []
-    for i in range(I):
-        x = df1.iloc[i, :]
-        v = stats.invgamma.rvs(a=(x['lambda_i'] * x['v_i']), scale=x['v_i'], size=G)
-        delta_IG.append(v)
-    delta_IG1=pd.DataFrame(np.column_stack(delta_IG))
-    delta_IG1.to_csv(os.path.join(results_common_path,"delta_IG.csv"),index=False)
-    print("===============================================================================")
-    print("sigma_G done")
+    
+    delta_IG = stats.invgamma.rvs(a=(lambda_I * v_I)[:,None], scale=v_I[:,None], size=(I, G))
+    delta_IG1 = pd.DataFrame(delta_IG, index=[f'batch_{i}' for i in range(I)],
+                  columns=[f'feature_{g}' for g in range(G)])
+
+    # ===============================================================================
+    
     sigma_G = stats.halfcauchy.rvs(loc=0,scale=0.2, size=G)
 
-    # print('Random parameters from distributions: done')
+    # Random parameters from distributions: done
     ##########################################################################################
-    print("=======================================================================")
-    print("age and sex done")
+    # =======================================================================
+    # age and sex 
     age,sex=age_sex_simulation(sex_type,age_type,n_samples)
-    standardized_age = [(a - np.mean(a)) / np.std(a) for a in age]
 
     x_all = []
     batch_pos_list = []
@@ -156,93 +159,105 @@ for i in range(simulation_times):
         batch_pos_list.append(np.repeat(site, x_df.shape[0]))  
 
     x_all = pd.concat(x_all)
-    print("==========================================================================")
-    batch_pos = pd.DataFrame(np.concatenate(batch_pos_list), columns=['batch_pos'])  
-    # print(x_all.shape)
-    torch.manual_seed(123)
+    # ==========================================================================
+    batch_pos = np.concatenate(batch_pos_list) 
+    
+    # torch.manual_seed(123)
     phi=[]
     for g in range(G):
         phi.append(fixed_effect(x_all,effect_type))
-    print("phi done")
-    # print(phi[0].shape)
-    phi1=pd.DataFrame(phi)
-    phi1.to_csv(os.path.join(results_common_path,"fixed_effects.csv"),index=False)
-    print('==========================================================================================================')
+
+    phi1=pd.DataFrame(phi).reset_index(drop=True)
+    # phi1.to_csv(os.path.join(results_common_path,"fixed_effects.csv"),index=False)
+    
+    params = {
+        "sample size per batch":{"data": n_samples, "columns": ["sample_size"]},
+        "alpha": alpha_G.to_frame().to_dict(orient="split"),       
+        "gamma": gamma_IG1.to_dict(orient="split"),                
+        "delta": delta_IG1.to_dict(orient="split"),                
+        "fixed_effects": phi1.to_dict(orient="split")              
+    }
+    #create a file containing parameters alpha,gamma,...
+
+    for attempt in range(max_retries):
+        try:
+            path1=os.path.join(results_common_path,"params.pickle")
+            with open(path1, "wb") as f:
+                pickle.dump(params, f)
+            with open(os.path.join(results_common_path, "params.json"), "w") as jf:
+                json.dump(params, jf, indent=4)
+
+            break  # success, exit loop
+        except TimeoutError:
+            print(f"Retrying config write... attempt {attempt+1}")
+            time.sleep(2)
+    else:
+        raise TimeoutError(f"Failed to write config after {max_retries} attempts.")
+        
+    # print('==========================================================================================================')
     """Generate data"""
     data=[]
-    epsilon=[]
+    # epsilon=[]
     for site in range(I):
         gamma_i = gamma_IG[site]
         delta_i = delta_IG[site]  
         x_df = pd.DataFrame({'age': age[site], 'sex': sex[site]})  
         data1 = pd.DataFrame({
-        'batch': np.repeat(site+1, n_samples[site]),
+        'batch': batch_pos_list[site],
         'age': age[site],
         'sex': sex[site]
     })
-        loc = np.where(batch_pos['batch_pos'].to_numpy() == site)[0]
+        loc = np.where(batch_pos == site)[0]
         Feature=[]
         Ground_truth=[]
-        epsilon1=[]
+        # epsilon1=[]
         for feature in range(G):
             sigma_g = sigma_G[feature]
             alpha_g=alpha_G[feature]
             gamma_ig=gamma_i[feature]
             delta_ig=delta_i[feature]
-            # epsilon_ijg=stats.norm.rvs(loc=0,scale=sigma_g,size=n_samples[site])
+            
             phi_g=phi[feature]
             phi_ig= phi_g[loc] 
-            # print(len(phi_ig))
 
             std=delta_ig*sigma_g
-            # y_ig=alpha_g+phi+gamma_ig+delta_ig*epsilon_ijg
-            # theta_g=theta_G[feature]
-            # ground_truth=alpha_g+np.dot(x_df,theta_g)+gamma_ig
+ 
             ground_truth=alpha_g+phi_ig
             mu=alpha_g+phi_ig+gamma_ig
-            # print(len(ground_truth))
-            # print(std)
-            y_ig = []
-            e = []
 
-            for j in range(n_samples[site]):
-                phi_ijg=phi_ig[j]
-                epsilon_ijg = stats.norm.rvs(loc=0, scale=sigma_g, size=1) 
-                y_ijg = alpha_g + phi_ijg + gamma_ig + delta_ig * epsilon_ijg  
+            epsilon_ig = stats.norm.rvs(loc=0, scale=sigma_g, size=n_samples[site])
+            y_ig = alpha_g + phi_ig + gamma_ig + delta_ig * epsilon_ig
 
-                y_ig.append(y_ijg)  
-                e.append(epsilon_ijg)  
-
-            e = np.array(e).flatten()
-            y_ig = np.array(y_ig).flatten() 
-
-            epsilon1.append(e)
+            # epsilon1.append(epsilon_ig)
             Feature.append(y_ig)
             Ground_truth.append(ground_truth)  
             # print(sigma_g,alpha_g,gamma_ig,delta_ig,phi_ig,theta_g)
-        epsilon1=pd.DataFrame(np.column_stack(epsilon1))
-        Feature=pd.DataFrame(np.column_stack(Feature),columns=[f'feature {i}' for i in range(G)])
+        # epsilon1=np.column_stack(epsilon1)
+        
+        Feature=np.column_stack(Feature)
 
-        Ground_truth=pd.DataFrame(np.column_stack(Ground_truth),columns=[f'ground_truth {i}' for i in range(G)])
-        data1=pd.concat([data1,Feature,Ground_truth],axis=1).reset_index(drop=True)
-        # print(data1.shape)
-        epsilon.append(epsilon1)
+        Ground_truth=np.column_stack(Ground_truth)
+
+        feature_cols = [f'feature {i}' for i in range(G)]
+        gt_cols = [f'ground_truth {i}' for i in range(G)]
+
+        feature_df = pd.DataFrame(Feature, columns=feature_cols)
+        gt_df = pd.DataFrame(Ground_truth, columns=gt_cols)
+        data1 = pd.concat([data1, feature_df, gt_df], axis=1).reset_index(drop=True)
+
+        # epsilon.append(epsilon1)
         data.append(data1)
 
-    epsilon=pd.concat(epsilon)
-    epsilon.columns=[f'epsilon {i}' for i in range(G)]
-    data=pd.concat(data)
-    data=pd.concat([data,epsilon],axis=1).reset_index(drop=True)
-    print("epsilon.shape:",epsilon.shape)
-    print("data.shape:",data.shape)
+    # epsilon = np.vstack(epsilon)
+    # epsilon_df = pd.DataFrame(epsilon, columns=[f'epsilon {i}' for i in range(G)])
 
-    print("epsilon done!")
-    print("===============================================================================")
-    output_dir = os.path.join(script_dir, 'simulated_data')#this directory is different with previous directory
-    os.makedirs(output_dir, exist_ok=True)
-    # epsilon.to_csv(os.path.join(output_dir, f'epsilon_{sampling_type}_age{age_type}_fixed{effect_type}_N{N}_G{G}_I{I}.csv'), index=False)
-    data.to_csv(os.path.join(results_common_path, f'{file_name}.csv'), index=False)#data_{sampling_type}_age{age_type}_fixed{effect_type}_N{N}_G{G}_I{I}.csv'
-    print("data saved!")
+    data = pd.concat(data).reset_index(drop=True)
+    # data = pd.concat([data, epsilon_df], axis=1).round(5)
+    print(data.shape)
+    
+    # print("===============================================================================")
+    #round data to be 5 decimals
+    data=data.round(5)
 
-
-
+    data.to_csv(os.path.join(results_common_path, 'data.csv'), index=False)#data_{sampling_type}_age{age_type}_fixed{effect_type}_N{N}_G{G}_I{I}.csv'
+    

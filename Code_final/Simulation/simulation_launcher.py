@@ -3,13 +3,12 @@ import subprocess
 import json
 
 script_dir=os.path.dirname(os.path.realpath(__file__))
-script_path = os.path.join(script_dir,"Simulation.py")
+script_path = os.path.join(script_dir,"simulation.py")
 
 base_config_path = os.path.join(script_dir,"simulation.json")
 
-default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
-
 #****where need to modify
+default_path="/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/combat_sites"
 
 config={"store_folder":"test1",#folder name storing simulations
         "sampling_type": "H",
@@ -21,7 +20,7 @@ config={"store_folder":"test1",#folder name storing simulations
         "I": 5,
         "gamma_scale": 4}
 
-numbers = [5, 6, 8, 10] + list(range(12, 302, 20))#size per batch
+numbers = [5, 6, 8, 10] + list(range(12, 302, 10))#size per batch
 size_list = [num * config["I"] for num in numbers]#total sample size
 #at least 5 is needed to avoid singular matrix through computation in combat models
 ##*****

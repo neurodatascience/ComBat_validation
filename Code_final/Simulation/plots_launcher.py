@@ -6,7 +6,7 @@ import json
 script_dir=os.path.dirname(os.path.realpath(__file__))
 script_path1 = os.path.join(script_dir,"gamma_delta_plot.py")
 script_path2 = os.path.join(script_dir,"harmonized_data_plot.py")
-default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
+default_path="/Users/xiaoqixie/Desktop/Mcgill/Winter_Rotation/combat_sites"
 
 N_list=[5, 6, 8, 10] + list(range(12, 302, 20))
 

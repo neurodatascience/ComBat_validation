@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
+default_path="/Users/xiaoqixie/Desktop/Mcgill/Winter_Rotation/combat_sites"
 
 import argparse
 

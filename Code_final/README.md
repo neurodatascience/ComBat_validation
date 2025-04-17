@@ -52,6 +52,15 @@ These scripts are used to generate plots for simulated data for comparing harmon
 
   **Note**: You may want to update the `default_path` specified in both `simulation.py` and `simulation_launcher.py`.
 
+- **`sample_size.py`**  
+  This script investigates whether increasing the sample size improves the performance of the neuroComBat and dComBat models.
+
+  **Note**: Make sure to update the `default_path` to match your local directory structure.
+
+- **`variance_gamma.py`** and **`variance_gamma.ipynb`**  
+  These two versions (script and notebook) analyze the impact of gamma variance on model performance.  
+  The notebook (`.ipynb`) version includes specific values and plots generated during the analysis.
+
 #===================================================================================
 ## Neural-Combat and D-Combat Scripts
 

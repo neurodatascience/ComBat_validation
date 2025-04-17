@@ -1,0 +1,13 @@
+{
+    "store_folder": "test1",
+    "sampling_type": "H",
+    "simulation_times": 100,
+    "sex_type": "In",
+    "age_type": "In",
+    "effect_type": "nonlinear",
+    "G": 100,
+    "I": 5,
+    "gamma_scale": 4,
+    "N": 1460,
+    "smallest_sample_size_of_batches": 292
+}

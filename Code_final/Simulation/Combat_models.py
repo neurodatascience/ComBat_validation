@@ -2,10 +2,11 @@ import os
 import pandas as pd
 import pickle
 import sys
+sys.path.append("/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/Code_final")
 from helper import neuro_combat_train,d_combat_train
 
 #specify your own working directory
-default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
+default_path="/Users/xiaoqixie/Desktop/Mcgill/Winter_Rotation/combat_sites"
 
 import argparse
 

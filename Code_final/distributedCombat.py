@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import pickle
 import sys
-sys.path.append("/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation")
+sys.path.append("/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/Code_final")
 
-import Parameter_estimations.distributedCombat_helpers_mod as helpers
+import distributedCombat_helpers_mod as helpers
 
 #' Distributed ComBat step at each site
 #'

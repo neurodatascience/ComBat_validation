@@ -55,6 +55,8 @@ The simulated dataset includes the ground truth (values without gamma and delta 
 from scipy import stats
 import numpy as np
 import pandas as pd
+import sys
+sys.path.append("/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/Code_final")
 from helper import age_sex_simulation,sites_samples,fixed_effect 
 import os
 import json
@@ -87,7 +89,9 @@ gamma_scale = config["gamma_scale"]
 #####################################################################################
 file_name=f'N{N}'
 
-default_path=f'/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites/{store_folder}'
+##****where need to change
+default_path=f'/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/combat_sites/{store_folder}'
+#########################
 
 script_dir=os.path.realpath(os.path.dirname(__file__))
 

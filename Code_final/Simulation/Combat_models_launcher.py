@@ -6,7 +6,7 @@ script_dir=os.path.dirname(os.path.realpath(__file__))
 script_path = os.path.join(script_dir,"Combat_models.py")
 
 ###specify your own working directory
-default_path="/Users/xiaoqixie/Desktop/Mcgill/Rotations/Winter_Rotation/combat_sites"
+default_path="/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/combat_sites"
 
 base_config_path = os.path.join(default_path,"test1",
                         "simulation_parameters.json")

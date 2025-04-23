@@ -62,8 +62,7 @@ import os
 import json
 import time
 import pickle
-# np.random.seed(666)
-
+import torch
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -92,7 +91,6 @@ file_name=f'N{N}'
 ##****where need to change
 default_path=f'/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/combat_sites/{store_folder}'
 #########################
-
 script_dir=os.path.realpath(os.path.dirname(__file__))
 
 max_retries = 3
@@ -100,6 +98,10 @@ max_retries = 3
 for i in range(simulation_times):
     print(f"simulation {i}")
     # print("n_samples done")
+    np.random.seed(126+i)
+
+    torch.manual_seed(126 + i)
+
     n_samples=sites_samples(sampling_type,N,I)
 
     smallest_sample_size= int(np.min(n_samples))
@@ -264,7 +266,7 @@ for i in range(simulation_times):
     #round data to be 5 decimals
     data=data.round(5)
 
-    data.to_csv(os.path.join(results_common_path, 'data.csv'), index=False)#data_{sampling_type}_age{age_type}_fixed{effect_type}_N{N}_G{G}_I{I}.csv'
+    data.to_csv(os.path.join(results_common_path, 'data.csv'), index=False)
     
 
 

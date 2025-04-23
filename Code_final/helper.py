@@ -465,13 +465,14 @@ def sites_samples(sampling_type, N, I):
     - 'H' stands for homogeneous, where each site has an equal sample size.
     - 'In' stands for heterogeneous, where site sample sizes are unequal.
     """
+    
     if sampling_type == 'H':
         n_i = int(N / I)
         n_samples = [n_i for _ in range(I)]
     elif sampling_type == 'In':
         alpha = np.random.randint(1, 21, size=I)
         p = np.random.dirichlet(alpha)
-        n_samples = (N * p).round(0).astype(int)
+        n_samples = (N * p).round(0).astype(int).tolist()
     else:
         raise ValueError("Invalid sampling_type. Choose 'Homogeneous' or 'Heterogeneity'.")
     
@@ -540,7 +541,7 @@ def fixed_effect_nonlinear(x_df):
     """
     This function implements the nonlinear form of fixed effects for age and sex.
     """
-
+    
     class MLP(nn.Module):
         def __init__(self, input_dim=2, hidden_dim=128, output_dim=1):
             super(MLP, self).__init__()

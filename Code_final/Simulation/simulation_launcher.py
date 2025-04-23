@@ -10,18 +10,25 @@ base_config_path = os.path.join(script_dir,"simulation.json")
 #****where need to modify
 default_path="/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/combat_sites"
 
-config={"store_folder":"test1",#folder name storing simulations
-        "sampling_type": "H",
-        "simulation_times": 100,
-        "sex_type": "In",
-        "age_type": "In",
+config={"store_folder":"test2",#folder name storing simulations
+        "sampling_type": "In",#In:inhomogeneous; H: homoegeneous
+        "simulation_times": 1,#how mamny simulations do we want
+        "sex_type": "In",#In:inhomogeneous; H: homoegeneous
+        "age_type": "In",#In:inhomogeneous; H: homoegeneous
         "effect_type": "nonlinear",
-        "G": 100,
+        "G": 2,
         "I": 5,
-        "gamma_scale": 4}
+        "gamma_scale": 0.5}
 
-numbers = [5, 6, 8, 10] + list(range(12, 302, 10))#size per batch
-size_list = [num * config["I"] for num in numbers]#total sample size
+#size per batch
+numbers = []#customize by your choice
+#example: [5, 6, 8, 10] + list(range(12, 302, 10))
+
+if not numbers:
+    size_list = [200]#customize by your choice
+else:
+    size_list = [num * config["I"] for num in numbers]
+#we want to simulate data for which sample size. We can put more than one sample size here.
 #at least 5 is needed to avoid singular matrix through computation in combat models
 ##*****
 

@@ -32,7 +32,7 @@ The following scripts were written for simulated data. The scripts can be found 
   **Note**: You may want to update the `default_path` in both `Combat_models.py` and `Combat_models_launcher.py`.
 
 - **`example_models.py`**  
-  This script is used to train 2 simulated models used in section 3.1.
+  This script is used to train 2 simulated models used in report section 3.1 figure 1..
 ### Visualization Scripts
 
 These scripts are used to generate plots for simulated data for comparing harmonization results and model parameters:

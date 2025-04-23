@@ -4,6 +4,8 @@
 This folder contains all core scripts necessary for simulation and analysis.
 - **`README.md`**: Provides detailed descriptions of each script in this directory.
 
+### The following scripts are in `Code_final/`
+
 ## Simulated Data Scripts
 
 The following scripts were written for simulated data. The scripts can be found in the folder `Simulation`:

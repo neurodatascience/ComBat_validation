@@ -6,18 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 sys.path.append("/Users/xiaoqixie/Desktop/Mcgill/winter_rotation/Code_final")
-from helper import neuro_combat_train,d_combat_train
-
+import seaborn as sns
 print("===================================================================================")
 common_path="/Users/xiaoqixie/Desktop/Mcgill/Winter_Rotation"
 ppmi_case_folder_path=os.path.join(common_path,"PPMI")
 
 #*****************************************************************************************#
-save_path=os.path.join(ppmi_case_folder_path,'bootstrap_plot')
+save_path=os.path.join(ppmi_case_folder_path,'bootstrap_plot',"version 2")
 os.makedirs(save_path,exist_ok=True)
 #***************************************************************************************#
 print("import ppmi case data")
 Data=pd.read_csv(os.path.join(ppmi_case_folder_path,"data_at_least6.csv"))
+
 # Data=Data.drop(columns=["EstimatedTotalIntraCranialVol"])
 feature_name = [col for col in Data.columns if col not in ["batch", "age", "sex"]]
 
@@ -58,9 +58,9 @@ d_beta = pd.DataFrame(d_output[keys[0]]['beta'])  # beta is same across batches
 d_beta_sex = pd.Series(d_beta.iloc[0, :].to_numpy())
 d_beta_age = pd.Series(d_beta.iloc[1, :].to_numpy())
 
-# ============================================================
-# GAMMA_STAR: Additive batch effects
-# ============================================================
+# # ============================================================
+# # GAMMA_STAR: Additive batch effects
+# # ============================================================
 # Shape: (n_batches × n_features)
 
 d_gamma = pd.DataFrame([d_output[k]['gamma_star'] for k in d_output.keys()]).reset_index(drop=True)
@@ -112,456 +112,182 @@ for i in range(len(n_combat_output)):#bootstraps
 
 alpha_n=pd.concat(alpha_n,axis=1).T#N x features
 alpha_n_avg=pd.Series(alpha_n.mean(axis=0)).reset_index(drop=True)#features
-alpha_n.columns = [f'feature{i}' for i in range(alpha_n.shape[1])]
+alpha_n.columns = [feature_name[i] for i in range(alpha_n.shape[1])]
+# print(alpha_n.columns)
 
 alpha_d=pd.concat(alpha_d,axis=1).T
 alpha_d_avg=pd.Series(alpha_d.mean(axis=0)).reset_index(drop=True)#features
-alpha_d.columns = [f'feature{i}' for i in range(alpha_d.shape[1])]
+alpha_d.columns = [feature_name[i] for i in range(alpha_d.shape[1])]
 
-x_label = [f'feature{i}' for i in range(alpha_n.shape[1])]
-# ========== Confidence bounds ==========
-p1, p2 = 0.025, 0.975
-bounds_n = {
-    f: np.quantile(alpha_n.iloc[:, f], [p1, p2])
-    for f in range(alpha_n.shape[1])
-}
-bounds_d = {
-    f: np.quantile(alpha_d.iloc[:, f], [p1, p2])
-    for f in range(alpha_d.shape[1])
-}
+x_label = [feature_name[i] for i in range(alpha_n.shape[1])]
 
-bounds_n = pd.DataFrame(bounds_n).reset_index(drop=True)
-bounds_d = pd.DataFrame(bounds_d).reset_index(drop=True)
+#
+alpha_n['source'] = 'n_combat'
+alpha_d['source'] = 'd_combat'
 
-# print(bounds_n)
-#******************************************************************#
-#neuro plot
-# ========== Prepare for plotting ==========
-# Compute asymmetric error bars
-yerr_lower1 = pd.Series(alpha_n_avg - bounds_n.iloc[0])
-yerr_upper1 = pd.Series(bounds_n.iloc[1]- alpha_n_avg)
-
-num_features = len(feature_name)
-
-feature_name_f=pd.Series(feature_name)
-
-n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
+df_combined = pd.concat([alpha_n, alpha_d], axis=0).reset_index(drop=True)
+long_df = pd.melt(df_combined, id_vars='source', var_name='feature', value_name='alpha')
 
 # Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
+n_cols = 4
+n_rows = 4
+fig, axs = plt.subplots(n_rows, n_cols, figsize=(24, 4 * n_rows), sharex=False)
+axs = axs.flatten()
 
-if num_features == 1:
-    axs = [axs]
+for i, feature in enumerate(feature_name):
+    ax = axs[i]
+    feature_data = long_df[long_df['feature'] == feature]
 
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    alpha_val = round(alpha_n_avg.iloc[i].item(),3)
-    original_val = round(n_alpha.iloc[i].item(),3)
-    yerr_lower = round(yerr_lower1.iloc[i].item(),3)
-    yerr_upper = round(yerr_upper1.iloc[i].item())
+    sns.violinplot(data=feature_data,
+                   x='source', y='alpha', hue='source',
+                   ax=ax, palette='muted', inner=None, legend=False, alpha=0.6)
 
-    # Compute vertical range for dynamic offset
-    y_vals = [alpha_val, original_val, alpha_val - yerr_lower, alpha_val + yerr_upper]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # Adjust this multiplier as needed
+    # Overlay bootstrap mean (jittered)
+    ax.scatter(-0.1, alpha_n_avg.iloc[i], color='red', label='Bootstrap mean' if i == 0 else "", zorder=10)
+    ax.scatter(1.1, alpha_d_avg.iloc[i], color='red', zorder=10)
 
-    # Plot error bar
-    ax.errorbar(0, alpha_val,
-                yerr=[[yerr_lower], [yerr_upper]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+    # Overlay original alpha (green X, jittered)
+    ax.scatter(0.1, n_alpha.iloc[i], color='green', marker='x', label='Original alpha' if i == 0 else "", s=70, zorder=11)
+    ax.scatter(0.9, d_alpha.iloc[i], color='green', marker='x', s=70, zorder=11)
 
-    # Annotate bootstrapped mean value
-    ax.text(0.005, alpha_val + offset, f'{round(alpha_val, 3):.3f}',
-            color='red', va='bottom', ha='left')
-
-    # Plot original data alpha
-    ax.scatter(0, original_val, color='green', label='Original data alpha', marker='x', s=50)
-
-    # Annotate original data alpha value
-    ax.text(0.005, original_val - offset, f'{round(original_val, 3):.3f}',
-            color='green', va='top', ha='left')
-    
-    # Customize subplot
-    ax.set_ylabel('Alpha value')
-    ax.set_title(f'Feature: {feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
+    ax.set_title(f'Feature: {feature_name[i]}')
+    ax.set_ylabel('Alpha')
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['n_combat', 'd_combat'])
     ax.grid(True)
 
 handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.87, 1), frameon=False,prop={'size': 20})
+
 plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_alpha_n.png'), bbox_inches='tight')
-# plt.show()
-#******************************************************************#
-#d-combat plot
-yerr_lower2 = pd.Series(alpha_d_avg - bounds_d.iloc[0])
-yerr_upper2 = pd.Series(bounds_d.iloc[1] - alpha_d_avg)
+plt.subplots_adjust(right=0.87)
+plt.savefig(os.path.join(save_path, f'b{N}_alpha_violin_clear.png'), bbox_inches='tight')
+plt.close()
 
-num_features = len(feature_name)
 
-n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
-
-# Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
-
-if num_features == 1:
-    axs = [axs]
-
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    # Get scalar values
-    alpha_val = round(alpha_d_avg.iloc[i].item(),3)
-    original_val = round(d_alpha.iloc[i].item(),3)
-    yerr_lower = round(yerr_lower2.iloc[i].item(),3)
-    yerr_upper = round(yerr_upper2.iloc[i].item(),3)
-
-    # Calculate vertical range for dynamic offset
-    y_vals = [alpha_val, original_val, alpha_val - yerr_lower, alpha_val + yerr_upper]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # You can tweak this factor if needed
-
-    # Plot error bar for bootstrapped mean
-    ax.errorbar(0, alpha_val,
-                yerr=[[yerr_lower], [yerr_upper]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
-
-    ax.text(0.005, alpha_val + offset, f'{round(alpha_val, 3):.3f}',
-            color='red', va='bottom', ha='left')
-
-    # Plot original data alpha
-    ax.scatter(0, original_val, color='green', label='Original data alpha', marker='x', s=50)
-
-    ax.text(0.005, original_val - offset, f'{round(original_val, 3):.3f}',
-            color='green', va='top', ha='left')
-
-    # Customize subplot
-    ax.set_ylabel('Alpha value')
-    ax.set_title(f'Feature: {feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
-    ax.grid(True)
-    
-
-handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
-plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_alpha_d.png'), bbox_inches='tight')
-# plt.show()
 print("=====================================================================================")
 #beta
 #**********************************************************************************************#
 #sex
 feature_name_f=pd.Series(feature_name)
-beta_n=[]
-beta_d=[]
-for i in range(len(n_combat_output)):#bootstraps
-    beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][0,:]))#row avg
-    beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][0,:]))#beta sotred in different batches are same
+beta_n = []
+beta_d = []
+for i in range(len(n_combat_output)):
+    beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][0, :]))
+    beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][0, :]))
 
-beta_n=pd.concat(beta_n,axis=1).T#N x features
-beta_n_avg=pd.Series(beta_n.mean(axis=0).to_numpy())#features
-beta_n.columns=[f'feature{i}' for i in range(len(beta_n_avg))]
+beta_n = pd.concat(beta_n, axis=1).T  # N x features
+beta_n_avg = pd.Series(beta_n.mean(axis=0).to_numpy())
+beta_n.columns = [feature_name[i] for i in range(len(beta_n_avg))]
 
-beta_d=pd.concat(beta_d,axis=1).T
-beta_d_avg=pd.Series(beta_d.mean(axis=0).to_numpy())#features
-beta_d.columns=[f'feature{i}' for i in range(len(beta_d_avg))]
+beta_d = pd.concat(beta_d, axis=1).T
+beta_d_avg = pd.Series(beta_d.mean(axis=0).to_numpy())
+beta_d.columns = [feature_name[i] for i in range(len(beta_d_avg))]
+beta_n['source'] = 'n_combat'
+beta_d['source'] = 'd_combat'
 
-x_label=[f'feature{i}' for i in range(len(beta_n))]
+df_combined_beta = pd.concat([beta_n, beta_d], axis=0).reset_index(drop=True)
+long_df_beta = pd.melt(df_combined_beta, id_vars='source', var_name='feature', value_name='beta')
 
-p1=0.025
-p2=0.975
-
-bounds_n={}
-bounds_d={}
-for f in range(len(beta_n_avg)):
-    bounds_n[f]=np.quantile(beta_n.iloc[:,f],[p1,p2])
-    bounds_d[f]=np.quantile(beta_d.iloc[:,f],[p1,p2])
-
-bounds_n=pd.DataFrame(bounds_n).T.reset_index(drop=True)
-bounds_d=pd.DataFrame(bounds_d).T.reset_index(drop=True)
-
-#neuro plot
-lower_bounds_filtered = np.array(bounds_n.iloc[:,0])
-upper_bounds_filtered = np.array(bounds_n.iloc[:,1])
-
-yerr_lower = beta_n_avg - lower_bounds_filtered
-yerr_upper = upper_bounds_filtered - beta_n_avg
-
-num_features = len(feature_name)
-
+# ==================== Plot ====================
 n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
+n_rows = 4
+fig, axs = plt.subplots(n_rows, n_cols, figsize=(24, 4 * n_rows), sharex=False)
+axs = axs.flatten()
 
-# Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
+for i, feature in enumerate(feature_name):
+    ax = axs[i]
+    feature_data = long_df_beta[long_df_beta['feature'] == feature]
 
-if num_features == 1:
-    axs = [axs]
+    # Violin plot
+    sns.violinplot(data=feature_data,
+                   x='source', y='beta', hue='source',
+                   ax=ax, palette='muted', inner=None, legend=False, alpha=0.6)
 
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    # Extract scalar values
-    beta_val = round(beta_n_avg.iloc[i].item(),3)
-    original_val = round(n_beta_sex.iloc[i].item(),3)
-    yerr_lower_val = round(yerr_lower.iloc[i].item(),3)
-    yerr_upper_val = round(yerr_upper.iloc[i].item(),3)
+    # Overlay bootstrap mean (jittered)
+    ax.scatter(-0.1, beta_n_avg.iloc[i], color='red', label='Bootstrap mean' if i == 0 else "", zorder=10)
+    ax.scatter(1.1, beta_d_avg.iloc[i], color='red', zorder=10)
 
-    # Compute dynamic vertical offset
-    y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # Adjust this factor as needed
+    # Overlay original beta values
+    ax.scatter(0.1, n_beta_sex.iloc[i], color='green', marker='x', label='Original beta' if i == 0 else "", s=70, zorder=11)
+    ax.scatter(0.9, d_beta_sex.iloc[i], color='green', marker='x', s=70, zorder=11)
 
-    # Plot error bar for bootstrapped mean
-    ax.errorbar(0, beta_val,
-                yerr=[[yerr_lower_val], [yerr_upper_val]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
-
-    # Plot original data beta
-    ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
-
-    ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
-            va='bottom', ha='left', transform=ax.transData)
-
-    ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
-            va='top', ha='left', transform=ax.transData)
-
-   # Customize subplot
-    ax.set_ylabel('beta value')
-    ax.set_title(f'Feature: sex-{feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
+    ax.set_title(f'Feature: sex-{feature_name[i]}')
+    ax.set_ylabel('Beta')
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['n_combat', 'd_combat'])
     ax.grid(True)
 
 handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.87, 1), frameon=False, prop={'size': 20})
+
 plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_beta_sex_n.png'), bbox_inches='tight')
+plt.subplots_adjust(right=0.87)
+plt.savefig(os.path.join(save_path, f'b{N}_beta_sex_violin_clear.png'), bbox_inches='tight')
+plt.close()
 
-#d plot
-lower_bounds_filtered = bounds_n.iloc[:,0]
-upper_bounds_filtered = bounds_n.iloc[:,1]
-
-
-yerr_lower = beta_d_avg - lower_bounds_filtered
-yerr_upper = upper_bounds_filtered - beta_d_avg
-asymmetric_error = [yerr_lower, yerr_upper]
-
-n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
-
-# Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
-
-if num_features == 1:
-    axs = [axs]
-
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    # Extract scalar values
-    beta_val = beta_d_avg.iloc[i].item()
-    original_val = d_beta_sex.iloc[i].item()
-    yerr_lower_val = yerr_lower.iloc[i].item()
-    yerr_upper_val = yerr_upper.iloc[i].item()
-
-    # Compute dynamic vertical offset
-    y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # Small dynamic spacing
-
-    # Plot error bar for bootstrapped mean
-    ax.errorbar(0, beta_val,
-                yerr=[[yerr_lower_val], [yerr_upper_val]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
-    
-    # Plot original data beta
-    ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
-
-    ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
-            va='bottom', ha='left', transform=ax.transData)
-
-    ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
-            va='top', ha='left', transform=ax.transData)
-
-    # Customize subplot
-    ax.set_ylabel('beta value')
-    ax.set_title(f'Feature: sex-{feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
-    ax.grid(True)
-
-handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
-plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_beta_sex_d.png'), bbox_inches='tight')
 #**********************************************************************************************#
 #age
-beta_n=[]
-beta_d=[]
-for i in range(len(n_combat_output)):#bootstraps
-    beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][1,:]))#row avg
-    beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][1,:]))#beta sotred in different batches are same
+beta_n = []
+beta_d = []
+for i in range(len(n_combat_output)):
+    beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][1, :]))
+    beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][1, :]))
 
-beta_n=pd.concat(beta_n,axis=1).T#N x features
-beta_n_avg=pd.Series(beta_n.mean(axis=0).to_numpy())#features
-beta_n.columns=[f'feature{i}' for i in range(len(beta_n_avg))]
+beta_n = pd.concat(beta_n, axis=1).T
+beta_n_avg = pd.Series(beta_n.mean(axis=0).to_numpy())
+beta_n.columns = [feature_name[i] for i in range(len(beta_n_avg))]
 
-beta_d=pd.concat(beta_d,axis=1).T
-beta_d_avg=pd.Series(beta_d.mean(axis=0).to_numpy())#features
-beta_d.columns=[f'feature{i}' for i in range(len(beta_d_avg))]
+beta_d = pd.concat(beta_d, axis=1).T
+beta_d_avg = pd.Series(beta_d.mean(axis=0).to_numpy())
+beta_d.columns = [feature_name[i] for i in range(len(beta_d_avg))]
 
-x_label=[f'feature{i}' for i in range(len(beta_n))]
+# Add source labels
+beta_n['source'] = 'n_combat'
+beta_d['source'] = 'd_combat'
 
-p1=0.025
-p2=0.975
+# Combine and reshape
+df_combined_beta = pd.concat([beta_n, beta_d], axis=0).reset_index(drop=True)
+long_df_beta = pd.melt(df_combined_beta, id_vars='source', var_name='feature', value_name='beta')
 
-bounds_n={}
-bounds_d={}
-for f in range(len(beta_n_avg)):
-    bounds_n[f]=np.quantile(beta_n.iloc[:,f],[p1,p2])
-    bounds_d[f]=np.quantile(beta_d.iloc[:,f],[p1,p2])
-
-bounds_n=pd.DataFrame(bounds_n).T.reset_index(drop=True)
-bounds_d=pd.DataFrame(bounds_d).T.reset_index(drop=True)
-
-#neuro plot
-lower_bounds= np.array(bounds_n.iloc[:,0])
-upper_bounds = np.array(bounds_n.iloc[:,1])
-
-yerr_lower = beta_n_avg - lower_bounds
-yerr_upper = upper_bounds - beta_n_avg
-asymmetric_error = [yerr_lower, yerr_upper]
-
+# ==================== Plotting ====================
 n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
+n_rows = 4
+fig, axs = plt.subplots(n_rows, n_cols, figsize=(24, 4 * n_rows), sharex=False)
+axs = axs.flatten()
 
-# Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
+for i, feature in enumerate(feature_name):
+    ax = axs[i]
+    feature_data = long_df_beta[long_df_beta['feature'] == feature]
 
-if num_features == 1:
-    axs = [axs]
+    # Violin plot
+    sns.violinplot(
+        data=feature_data,
+        x='source', y='beta', hue='source',
+        ax=ax, palette='muted', inner=None, legend=False, alpha=0.6
+    )
 
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    # Extract scalar values
-    beta_val = round(beta_n_avg.iloc[i].item(),3)
-    original_val = round(n_beta_age.iloc[i].item(),3)
-    yerr_lower_val = round(asymmetric_error[0].iloc[i].item(),3)
-    yerr_upper_val = round(asymmetric_error[1].iloc[i].item(),3)
+    # Overlay bootstrapped means (jittered)
+    ax.scatter(-0.1, beta_n_avg.iloc[i], color='red', label='Bootstrap mean' if i == 0 else "", zorder=10)
+    ax.scatter(1.1, beta_d_avg.iloc[i], color='red', zorder=10)
 
-    # Compute vertical range and dynamic offset
-    y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # Adjust spacing factor if needed
+    # Overlay original beta values (green x)
+    ax.scatter(0.1, n_beta_age.iloc[i], color='green', marker='x', label='Original beta' if i == 0 else "", s=70, zorder=11)
+    ax.scatter(0.9, d_beta_age.iloc[i], color='green', marker='x', s=70, zorder=11)
 
-    # Plot error bar for bootstrapped mean
-    ax.errorbar(0, beta_val,
-                yerr=[[yerr_lower_val], [yerr_upper_val]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
-
-    # Plot original data beta
-    ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
-
-    ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
-            va='bottom', ha='left', transform=ax.transData)
-
-    ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
-            va='top', ha='left', transform=ax.transData)
-
-    # Customize subplot
-    ax.set_ylabel('beta value')
-    ax.set_title(f'Feature: age-{feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
+    ax.set_title(f'Feature: age-{feature_name[i]}')
+    ax.set_ylabel('Beta')
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['n_combat', 'd_combat'])
     ax.grid(True)
 
 handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.87, 1), frameon=False, prop={'size': 20})
+
 plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_beta_age_n.png'), bbox_inches='tight')
-
-#d plot
-lower_bounds = np.array(bounds_d.iloc[:,0])
-upper_bounds = np.array(bounds_d.iloc[:,1])
-
-
-yerr_lower = beta_d_avg - lower_bounds
-yerr_upper = upper_bounds- beta_d_avg
-asymmetric_error = [yerr_lower, yerr_upper]
-
-n_cols = 4
-n_rows = int(np.ceil(num_features / n_cols))
-
-# Create subplots
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
-axs = axs.flatten()  # Flatten the 2D array of axes
-
-if num_features == 1:
-    axs = [axs]
-
-for i, ax in enumerate(axs):
-    feature_label = feature_name_f[i]
-    
-    # Extract scalar values
-    beta_val = round(beta_d_avg.iloc[i].item(),3)
-    original_val = round(d_beta_age.iloc[i].item(),3)
-    yerr_lower_val = round(asymmetric_error[0].iloc[i].item(),3)
-    yerr_upper_val = round(asymmetric_error[1].iloc[i].item(),3)
-
-    # Compute dynamic vertical offset
-    y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
-    y_range = max(y_vals) - min(y_vals)
-    offset = y_range * 0.03  # Adjust this multiplier if needed
-
-    # Plot error bar for bootstrapped mean
-    ax.errorbar(0, beta_val,
-                yerr=[[yerr_lower_val], [yerr_upper_val]],
-                fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
-                label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
-
-    # Plot original data beta
-    ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
-
-    ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
-            va='bottom', ha='left', transform=ax.transData)
-
-    ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
-            va='top', ha='left', transform=ax.transData)
-    
-    # Customize subplot
-    ax.set_ylabel('beta value')
-    ax.set_title(f'Feature: age-{feature_label}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([feature_label])
-    ax.grid(True)
-
-handles, labels = axs[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
-plt.tight_layout()
-plt.subplots_adjust(right=0.85)  
-plt.savefig(os.path.join(save_path,f'b{N}_beta_age_d.png'), bbox_inches='tight')
+plt.subplots_adjust(right=0.87)
+plt.savefig(os.path.join(save_path, f'b{N}_beta_age_violin_clear.png'), bbox_inches='tight')
+plt.close()
 print("======================================================================================")
 #gamma
 gamma_d={}
@@ -610,7 +336,7 @@ for b in range(n_gamma.shape[0]): # for each batch
 gamma_n_avg=pd.DataFrame(gamma_n_avg).T #batches x features
 
 #=============================================================================#
-# Assign color for batches
+# Assign color for batches no meanings for colors
 num_features = len(feature_name)
 keys = list(d_combat_output[1].keys())
 num_keys = len(keys)
@@ -651,7 +377,7 @@ for part_idx, feature_range in enumerate(feature_parts, start=1):
         axs[plot_idx].grid(True)
 
     axs[-1].set_xlabel("Batch ID")
-    axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    # axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
     plt.subplots_adjust(right=0.85)
     plt.savefig(os.path.join(save_path, f"b{N}_gamma_n_part{part_idx}.png"), bbox_inches='tight')
     plt.close()
@@ -691,7 +417,7 @@ for part_idx, feature_range in enumerate(feature_parts, start=1):
         axs[plot_idx].grid(True)
 
     axs[-1].set_xlabel("Batch ID")
-    axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    # axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
     plt.subplots_adjust(right=0.85)
     plt.savefig(os.path.join(save_path, f"b{N}_gamma_d_part{part_idx}.png"), bbox_inches='tight')
     plt.close()
@@ -745,7 +471,7 @@ for b in range(n_delta.shape[0]): # for each batch
 delta_n_avg=pd.DataFrame(delta_n_avg).T #batches x features
 
 #=============================================================================#
-# Assign color for batches
+# Assign color for batches no meanings for colors
 num_features = len(feature_name)
 keys = list(d_combat_output[1].keys())
 num_keys = len(keys)
@@ -786,7 +512,7 @@ for part_idx, feature_range in enumerate(feature_parts, start=1):
         axs[plot_idx].grid(True)
 
     axs[-1].set_xlabel("Batch ID")
-    axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    # axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
     plt.subplots_adjust(right=0.85)
     plt.savefig(os.path.join(save_path, f"b{N}_delta_n_part{part_idx}.png"), bbox_inches='tight')
     plt.close()
@@ -832,7 +558,7 @@ for part_idx, feature_range in enumerate(feature_parts, start=1):
         axs[plot_idx].grid(True)
 
     axs[-1].set_xlabel("Batch ID")
-    axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+    # axs[0].legend(loc='upper right', bbox_to_anchor=(1.15, 1))
     plt.subplots_adjust(right=0.85)
     os.makedirs(save_path, exist_ok=True)
     plt.savefig(os.path.join(save_path, f"b{N}_delta_d_part{part_idx}.png"), bbox_inches='tight')
@@ -1002,3 +728,445 @@ for part_idx, feature_range in enumerate(feature_parts, start=1):
 # os.makedirs(save_path,exist_ok=True)
 # plt.savefig(os.path.join(save_path,f"b{N}_delta_d.png"))
 # plt.close()
+
+# #alpha plot
+# # ========== Confidence bounds ==========
+# p1, p2 = 0.025, 0.975
+# bounds_n = {
+#     f: np.quantile(alpha_n.iloc[:, f], [p1, p2])
+#     for f in range(alpha_n.shape[1])
+# }
+# bounds_d = {
+#     f: np.quantile(alpha_d.iloc[:, f], [p1, p2])
+#     for f in range(alpha_d.shape[1])
+# }
+
+# bounds_n = pd.DataFrame(bounds_n).reset_index(drop=True)
+# bounds_d = pd.DataFrame(bounds_d).reset_index(drop=True)
+
+# print(bounds_n)
+#******************************************************************#
+#neuro plot
+# ========== Prepare for plotting ==========
+# Compute asymmetric error bars
+# yerr_lower1 = pd.Series(alpha_n_avg - bounds_n.iloc[0])
+# yerr_upper1 = pd.Series(bounds_n.iloc[1]- alpha_n_avg)
+
+# num_features = len(feature_name)
+
+# feature_name_f=pd.Series(feature_name)
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     alpha_val = round(alpha_n_avg.iloc[i].item(),3)
+#     original_val = round(n_alpha.iloc[i].item(),3)
+#     yerr_lower = round(yerr_lower1.iloc[i].item(),3)
+#     yerr_upper = round(yerr_upper1.iloc[i].item())
+
+#     # Compute vertical range for dynamic offset
+#     y_vals = [alpha_val, original_val, alpha_val - yerr_lower, alpha_val + yerr_upper]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # Adjust this multiplier as needed
+
+#     # Plot error bar
+#     ax.errorbar(0, alpha_val,
+#                 yerr=[[yerr_lower], [yerr_upper]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+
+#     # Annotate bootstrapped mean value
+#     ax.text(0.005, alpha_val + offset, f'{round(alpha_val, 3):.3f}',
+#             color='red', va='bottom', ha='left')
+
+#     # Plot original data alpha
+#     ax.scatter(0, original_val, color='green', label='Original data alpha', marker='x', s=50)
+
+#     # Annotate original data alpha value
+#     ax.text(0.005, original_val - offset, f'{round(original_val, 3):.3f}',
+#             color='green', va='top', ha='left')
+    
+#     # Customize subplot
+#     ax.set_ylabel('Alpha value')
+#     ax.set_title(f'Feature: {feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_alpha_n.png'), bbox_inches='tight')
+# # plt.show()
+# #******************************************************************#
+# #d-combat plot
+# yerr_lower2 = pd.Series(alpha_d_avg - bounds_d.iloc[0])
+# yerr_upper2 = pd.Series(bounds_d.iloc[1] - alpha_d_avg)
+
+# num_features = len(feature_name)
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     # Get scalar values
+#     alpha_val = round(alpha_d_avg.iloc[i].item(),3)
+#     original_val = round(d_alpha.iloc[i].item(),3)
+#     yerr_lower = round(yerr_lower2.iloc[i].item(),3)
+#     yerr_upper = round(yerr_upper2.iloc[i].item(),3)
+
+#     # Calculate vertical range for dynamic offset
+#     y_vals = [alpha_val, original_val, alpha_val - yerr_lower, alpha_val + yerr_upper]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # You can tweak this factor if needed
+
+#     # Plot error bar for bootstrapped mean
+#     ax.errorbar(0, alpha_val,
+#                 yerr=[[yerr_lower], [yerr_upper]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+
+#     ax.text(0.005, alpha_val + offset, f'{round(alpha_val, 3):.3f}',
+#             color='red', va='bottom', ha='left')
+
+#     # Plot original data alpha
+#     ax.scatter(0, original_val, color='green', label='Original data alpha', marker='x', s=50)
+
+#     ax.text(0.005, original_val - offset, f'{round(original_val, 3):.3f}',
+#             color='green', va='top', ha='left')
+
+#     # Customize subplot
+#     ax.set_ylabel('Alpha value')
+#     ax.set_title(f'Feature: {feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+    
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_alpha_d.png'), bbox_inches='tight')
+# # plt.show()
+
+#beta
+# beta_n=[]
+# beta_d=[]
+# for i in range(len(n_combat_output)):#bootstraps
+#     beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][0,:]))#row avg
+#     beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][0,:]))#beta sotred in different batches are same
+
+# beta_n=pd.concat(beta_n,axis=1).T#N x features
+# beta_n_avg=pd.Series(beta_n.mean(axis=0).to_numpy())#features
+# beta_n.columns=[f'feature{i}' for i in range(len(beta_n_avg))]
+
+# beta_d=pd.concat(beta_d,axis=1).T
+# beta_d_avg=pd.Series(beta_d.mean(axis=0).to_numpy())#features
+# beta_d.columns=[f'feature{i}' for i in range(len(beta_d_avg))]
+
+# x_label=[f'feature{i}' for i in range(len(beta_n))]
+
+# p1=0.025
+# p2=0.975
+
+# bounds_n={}
+# bounds_d={}
+# for f in range(len(beta_n_avg)):
+#     bounds_n[f]=np.quantile(beta_n.iloc[:,f],[p1,p2])
+#     bounds_d[f]=np.quantile(beta_d.iloc[:,f],[p1,p2])
+
+# bounds_n=pd.DataFrame(bounds_n).T.reset_index(drop=True)
+# bounds_d=pd.DataFrame(bounds_d).T.reset_index(drop=True)
+
+# #neuro plot
+# lower_bounds_filtered = np.array(bounds_n.iloc[:,0])
+# upper_bounds_filtered = np.array(bounds_n.iloc[:,1])
+
+# yerr_lower = beta_n_avg - lower_bounds_filtered
+# yerr_upper = upper_bounds_filtered - beta_n_avg
+
+# num_features = len(feature_name)
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     # Extract scalar values
+#     beta_val = round(beta_n_avg.iloc[i].item(),3)
+#     original_val = round(n_beta_sex.iloc[i].item(),3)
+#     yerr_lower_val = round(yerr_lower.iloc[i].item(),3)
+#     yerr_upper_val = round(yerr_upper.iloc[i].item(),3)
+
+#     # Compute dynamic vertical offset
+#     y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # Adjust this factor as needed
+
+#     # Plot error bar for bootstrapped mean
+#     ax.errorbar(0, beta_val,
+#                 yerr=[[yerr_lower_val], [yerr_upper_val]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+
+#     # Plot original data beta
+#     ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
+
+#     ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
+#             va='bottom', ha='left', transform=ax.transData)
+
+#     ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
+#             va='top', ha='left', transform=ax.transData)
+
+#    # Customize subplot
+#     ax.set_ylabel('beta value')
+#     ax.set_title(f'Feature: sex-{feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_beta_sex_n.png'), bbox_inches='tight')
+
+# #d plot
+# lower_bounds_filtered = bounds_n.iloc[:,0]
+# upper_bounds_filtered = bounds_n.iloc[:,1]
+
+
+# yerr_lower = beta_d_avg - lower_bounds_filtered
+# yerr_upper = upper_bounds_filtered - beta_d_avg
+# asymmetric_error = [yerr_lower, yerr_upper]
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     # Extract scalar values
+#     beta_val = beta_d_avg.iloc[i].item()
+#     original_val = d_beta_sex.iloc[i].item()
+#     yerr_lower_val = yerr_lower.iloc[i].item()
+#     yerr_upper_val = yerr_upper.iloc[i].item()
+
+#     # Compute dynamic vertical offset
+#     y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # Small dynamic spacing
+
+#     # Plot error bar for bootstrapped mean
+#     ax.errorbar(0, beta_val,
+#                 yerr=[[yerr_lower_val], [yerr_upper_val]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+    
+#     # Plot original data beta
+#     ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
+
+#     ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
+#             va='bottom', ha='left', transform=ax.transData)
+
+#     ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
+#             va='top', ha='left', transform=ax.transData)
+
+#     # Customize subplot
+#     ax.set_ylabel('beta value')
+#     ax.set_title(f'Feature: sex-{feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_beta_sex_d.png'), bbox_inches='tight')
+
+# #age
+# beta_n=[]
+# beta_d=[]
+# for i in range(len(n_combat_output)):#bootstraps
+#     beta_n.append(pd.DataFrame(n_combat_output[i]['beta'][1,:]))#row avg
+#     beta_d.append(pd.DataFrame(d_combat_output[i][keys[0]]['beta'][1,:]))#beta sotred in different batches are same
+
+# beta_n=pd.concat(beta_n,axis=1).T#N x features
+# beta_n_avg=pd.Series(beta_n.mean(axis=0).to_numpy())#features
+# beta_n.columns=[f'feature{i}' for i in range(len(beta_n_avg))]
+
+# beta_d=pd.concat(beta_d,axis=1).T
+# beta_d_avg=pd.Series(beta_d.mean(axis=0).to_numpy())#features
+# beta_d.columns=[f'feature{i}' for i in range(len(beta_d_avg))]
+
+# x_label=[f'feature{i}' for i in range(len(beta_n))]
+
+# p1=0.025
+# p2=0.975
+
+# bounds_n={}
+# bounds_d={}
+# for f in range(len(beta_n_avg)):
+#     bounds_n[f]=np.quantile(beta_n.iloc[:,f],[p1,p2])
+#     bounds_d[f]=np.quantile(beta_d.iloc[:,f],[p1,p2])
+
+# bounds_n=pd.DataFrame(bounds_n).T.reset_index(drop=True)
+# bounds_d=pd.DataFrame(bounds_d).T.reset_index(drop=True)
+
+# #neuro plot
+# lower_bounds= np.array(bounds_n.iloc[:,0])
+# upper_bounds = np.array(bounds_n.iloc[:,1])
+
+# yerr_lower = beta_n_avg - lower_bounds
+# yerr_upper = upper_bounds - beta_n_avg
+# asymmetric_error = [yerr_lower, yerr_upper]
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     # Extract scalar values
+#     beta_val = round(beta_n_avg.iloc[i].item(),3)
+#     original_val = round(n_beta_age.iloc[i].item(),3)
+#     yerr_lower_val = round(asymmetric_error[0].iloc[i].item(),3)
+#     yerr_upper_val = round(asymmetric_error[1].iloc[i].item(),3)
+
+#     # Compute vertical range and dynamic offset
+#     y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # Adjust spacing factor if needed
+
+#     # Plot error bar for bootstrapped mean
+#     ax.errorbar(0, beta_val,
+#                 yerr=[[yerr_lower_val], [yerr_upper_val]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+
+#     # Plot original data beta
+#     ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
+
+#     ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
+#             va='bottom', ha='left', transform=ax.transData)
+
+#     ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
+#             va='top', ha='left', transform=ax.transData)
+
+#     # Customize subplot
+#     ax.set_ylabel('beta value')
+#     ax.set_title(f'Feature: age-{feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_beta_age_n.png'), bbox_inches='tight')
+
+# #d plot
+# lower_bounds = np.array(bounds_d.iloc[:,0])
+# upper_bounds = np.array(bounds_d.iloc[:,1])
+
+
+# yerr_lower = beta_d_avg - lower_bounds
+# yerr_upper = upper_bounds- beta_d_avg
+# asymmetric_error = [yerr_lower, yerr_upper]
+
+# n_cols = 4
+# n_rows = int(np.ceil(num_features / n_cols))
+
+# # Create subplots
+# fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 3 * n_rows), sharex=False)
+# axs = axs.flatten()  # Flatten the 2D array of axes
+
+# if num_features == 1:
+#     axs = [axs]
+
+# for i, ax in enumerate(axs):
+#     feature_label = feature_name_f[i]
+    
+#     # Extract scalar values
+#     beta_val = round(beta_d_avg.iloc[i].item(),3)
+#     original_val = round(d_beta_age.iloc[i].item(),3)
+#     yerr_lower_val = round(asymmetric_error[0].iloc[i].item(),3)
+#     yerr_upper_val = round(asymmetric_error[1].iloc[i].item(),3)
+
+#     # Compute dynamic vertical offset
+#     y_vals = [beta_val, original_val, beta_val - yerr_lower_val, beta_val + yerr_upper_val]
+#     y_range = max(y_vals) - min(y_vals)
+#     offset = y_range * 0.03  # Adjust this multiplier if needed
+
+#     # Plot error bar for bootstrapped mean
+#     ax.errorbar(0, beta_val,
+#                 yerr=[[yerr_lower_val], [yerr_upper_val]],
+#                 fmt='o', color='red', ecolor='black', elinewidth=1.5, capsize=4,
+#                 label=f'Mean ± {p1*100}th–{p2*100}th percentile\nfrom {N} bootstrap')
+
+#     # Plot original data beta
+#     ax.scatter(0, original_val, color='green', label='Original data beta', marker='x', s=50)
+
+#     ax.text(0.005, beta_val + offset, f'{beta_val:.3f}', color='red',
+#             va='bottom', ha='left', transform=ax.transData)
+
+#     ax.text(0.005, original_val - offset, f'{original_val:.3f}', color='green',
+#             va='top', ha='left', transform=ax.transData)
+    
+#     # Customize subplot
+#     ax.set_ylabel('beta value')
+#     ax.set_title(f'Feature: age-{feature_label}')
+#     ax.set_xticks([0])
+#     ax.set_xticklabels([feature_label])
+#     ax.grid(True)
+
+# handles, labels = axs[0].get_legend_handles_labels()
+# fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.85, 1), frameon=False)
+# plt.tight_layout()
+# plt.subplots_adjust(right=0.85)  
+# plt.savefig(os.path.join(save_path,f'b{N}_beta_age_d.png'), bbox_inches='tight')
